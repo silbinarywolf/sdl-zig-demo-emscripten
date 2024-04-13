@@ -2,7 +2,28 @@ const std = @import("std");
 const Build = std.Build;
 const builtin = @import("builtin");
 
-pub fn build(b: *Build) !void {
+/// Do not rename this constant. It is scanned by some scripts to determine which zig version to install.
+const recommended_zig_version = "0.12.0-dev.3541+05b185811";
+
+pub fn build(b: *std.Build) !void {
+    switch (comptime builtin.zig_version.order(std.SemanticVersion.parse(recommended_zig_version) catch unreachable)) {
+        .eq => {},
+        .lt => {
+            @compileError("The minimum version of Zig required to compile is " ++ recommended_zig_version ++ ", found " ++ @import("builtin").zig_version_string ++ ".");
+        },
+        .gt => {
+            const colors = std.io.getStdErr().supportsAnsiEscapeCodes();
+            std.debug.print(
+                "{s}WARNING:\nApp recommends Zig version '{s}', but found '{s}', build may fail...{s}\n\n\n",
+                .{
+                    if (colors) "\x1b[1;33m" else "",
+                    recommended_zig_version,
+                    builtin.zig_version_string,
+                    if (colors) "\x1b[0m" else "",
+                },
+            );
+        },
+    }
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
@@ -24,17 +45,21 @@ pub fn build(b: *Build) !void {
         .target = target,
         .optimize = optimize,
     });
-    if (target.query.isNativeOs() and target.result.os.tag == .linux) {
-        // The SDL package doesn't work for Linux yet, so we rely on system
-        // packages for now.
-        exe.linkSystemLibrary("SDL2");
-        exe.linkLibC();
-    } else {
+
+    {
         const sdl_dep = b.dependency("sdl", .{
             .optimize = .ReleaseFast,
             .target = target,
         });
-        exe.linkLibrary(sdl_dep.artifact("SDL2"));
+        if (target.query.isNativeOs() and target.result.os.tag == .linux) {
+            // The SDL package doesn't work for Linux yet, so we rely on system
+            // packages for now.
+            exe.linkSystemLibrary("SDL2");
+            exe.linkLibC();
+        } else {
+            exe.linkLibrary(sdl_dep.artifact("SDL2"));
+        }
+        exe.root_module.addImport("sdl", sdl_dep.module("sdl"));
     }
 
     if (target.result.os.tag == .emscripten) {
@@ -249,12 +274,20 @@ fn emLinkStep(b: *Build, options: EmLinkOptions) !*Build.Step.Run {
         options.lib_main.step.dependOn(&emsdk_setup.step);
     }
 
+    // get sysroot include
+    const sysroot_include_path = if (b.sysroot) |sysroot| b.pathJoin(&.{ sysroot, "include" }) else @panic("unable to get sysroot path");
+
     // add the main lib, and then scan for library dependencies and add those too
     emcc.addArtifactArg(options.lib_main);
     var it = options.lib_main.root_module.iterateDependencies(options.lib_main, false);
     while (it.next()) |item| {
         if (maybe_emsdk_setup) |emsdk_setup| {
             item.compile.?.step.dependOn(&emsdk_setup.step);
+        }
+        if (sysroot_include_path.len > 0) {
+            // add emscripten system includes to each module, this ensures that any C-modules you import
+            // will "just work", assuming it'll run under Emscripten
+            item.module.addSystemIncludePath(.{ .path = sysroot_include_path });
         }
         for (item.module.link_objects.items) |link_object| {
             switch (link_object) {
