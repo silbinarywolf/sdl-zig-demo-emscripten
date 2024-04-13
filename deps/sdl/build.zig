@@ -49,11 +49,14 @@ pub fn build(b: *std.Build) !void {
             lib.defineCMacro("USE_SDL", "2");
             lib.addCSourceFiles(.{ .files = &emscripten_src_files });
 
-            const emsdk_sysroot = b.sysroot orelse {
-                @panic("Set \"b.sysroot\" to \"[path to emsdk installation]/upstream/emscripten/cache/sysroot\"'");
-            };
-            const include_path = b.pathJoin(&.{ emsdk_sysroot, "include" });
-            lib.addSystemIncludePath(.{ .path = include_path });
+            // NOTE(jae): 2024-04-13
+            // Used to do this, but now in our main "build.zig", I automatically add this systemIncludePath for each module
+            // when building under Emscripten
+            // const emsdk_sysroot = b.sysroot orelse {
+            //     @panic("Set \"b.sysroot\" to \"[path to emsdk installation]/upstream/emscripten/cache/sysroot\"'");
+            // };
+            // const include_path = b.pathJoin(&.{ emsdk_sysroot, "include" });
+            // lib.addSystemIncludePath(.{ .path = include_path });
         },
         else => {
             const config_header = b.addConfigHeader(.{
@@ -64,8 +67,15 @@ pub fn build(b: *std.Build) !void {
             lib.installConfigHeader(config_header, .{});
         },
     }
-    lib.installHeadersDirectory("include", "SDL2");
+    // note(jae): 2024-04-13
+    // Experimenting with just importing SDL from this dependency
+    // lib.installHeadersDirectory("include", "SDL2");
     b.installArtifact(lib);
+
+    var module = b.addModule("sdl", .{
+        .root_source_file = .{ .path = "sdl.zig" },
+    });
+    module.addIncludePath(.{ .path = "include" });
 }
 
 const generic_src_files = [_][]const u8{
