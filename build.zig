@@ -91,7 +91,7 @@ pub fn compileEmscripten(
     optimize: std.builtin.Mode,
 ) !*std.Build.Step.Compile {
     const target = resolved_target.query;
-    const new_target = b.resolveTargetQuery(std.zig.CrossTarget{
+    const new_target = b.resolveTargetQuery(std.Target.Query{
         .cpu_arch = target.cpu_arch,
         .cpu_model = target.cpu_model,
         .cpu_features_add = target.cpu_features_add,
