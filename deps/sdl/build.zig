@@ -11,7 +11,7 @@ pub fn build(b: *std.Build) !void {
         .optimize = optimize,
     });
 
-    lib.addIncludePath(.{ .path = "include" });
+    lib.addIncludePath(b.path("include"));
     lib.addCSourceFiles(.{ .files = &generic_src_files });
     lib.defineCMacro("SDL_USE_BUILTIN_OPENGL_DEFINITIONS", "1");
     lib.linkLibC();
@@ -60,11 +60,11 @@ pub fn build(b: *std.Build) !void {
         },
         else => {
             const config_header = b.addConfigHeader(.{
-                .style = .{ .cmake = .{ .path = "include/SDL_config.h.cmake" } },
+                .style = .{ .cmake = b.path("include/SDL_config.h.cmake") },
                 .include_path = "SDL2/SDL_config.h",
             }, .{});
             lib.addConfigHeader(config_header);
-            lib.installConfigHeader(config_header, .{});
+            lib.installConfigHeader(config_header);
         },
     }
     // note(jae): 2024-04-13
@@ -73,9 +73,9 @@ pub fn build(b: *std.Build) !void {
     b.installArtifact(lib);
 
     var module = b.addModule("sdl", .{
-        .root_source_file = .{ .path = "sdl.zig" },
+        .root_source_file = b.path("sdl.zig"),
     });
-    module.addIncludePath(.{ .path = "include" });
+    module.addIncludePath(b.path("include"));
 }
 
 const generic_src_files = [_][]const u8{
