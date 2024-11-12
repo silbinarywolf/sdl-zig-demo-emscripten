@@ -3,7 +3,7 @@ const Build = std.Build;
 const builtin = @import("builtin");
 
 /// Do not rename this constant. It is scanned by some scripts to determine which zig version to install.
-const recommended_zig_version = "0.12.0-dev.3541+05b185811";
+const recommended_zig_version = "0.13.0";
 
 pub fn build(b: *std.Build) !void {
     switch (comptime builtin.zig_version.order(std.SemanticVersion.parse(recommended_zig_version) catch unreachable)) {
@@ -41,7 +41,7 @@ pub fn build(b: *std.Build) !void {
         optimize,
     ) else b.addExecutable(.{
         .name = "sdl-zig-demo",
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -91,7 +91,7 @@ pub fn compileEmscripten(
     optimize: std.builtin.Mode,
 ) !*std.Build.Step.Compile {
     const target = resolved_target.query;
-    const new_target = b.resolveTargetQuery(std.zig.CrossTarget{
+    const new_target = b.resolveTargetQuery(std.Target.Query{
         .cpu_arch = target.cpu_arch,
         .cpu_model = target.cpu_model,
         .cpu_features_add = target.cpu_features_add,
@@ -115,14 +115,14 @@ pub fn compileEmscripten(
     // The project is built as a library and linked later.
     const exe_lib = b.addStaticLibrary(.{
         .name = name,
-        .root_source_file = .{ .path = root_source_file },
+        .root_source_file = b.path(root_source_file),
         .target = new_target,
         .optimize = optimize,
     });
 
     const emsdk_sysroot = b.pathJoin(&.{ emSdkPath(b), "upstream", "emscripten", "cache", "sysroot" });
     const include_path = b.pathJoin(&.{ emsdk_sysroot, "include" });
-    exe_lib.addSystemIncludePath(.{ .path = include_path });
+    exe_lib.addSystemIncludePath(.{ .cwd_relative = include_path });
 
     if (new_target.query.os_tag == .wasi) {
         const webhack_c =
@@ -287,7 +287,7 @@ fn emLinkStep(b: *Build, options: EmLinkOptions) !*Build.Step.Run {
         if (sysroot_include_path.len > 0) {
             // add emscripten system includes to each module, this ensures that any C-modules you import
             // will "just work", assuming it'll run under Emscripten
-            item.module.addSystemIncludePath(.{ .path = sysroot_include_path });
+            item.module.addSystemIncludePath(.{ .cwd_relative = sysroot_include_path });
         }
         for (item.module.link_objects.items) |link_object| {
             switch (link_object) {
