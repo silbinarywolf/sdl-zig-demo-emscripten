@@ -1,5 +1,7 @@
 # SDL2 Zig Demo
 
+⚠️ **WARNING:** This repository is not actively maintained and may not work in later Zig versions. Raise a PR if you're willing to fix it.
+
 Here's a basic window with SDL2 in Zig.
 
 ![screenshot](screenshot1.png)
